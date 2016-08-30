@@ -11,6 +11,7 @@
 *.hex
 libraries/*
 out
+.idea
 
 # Eclipse files
 */*/.settings
