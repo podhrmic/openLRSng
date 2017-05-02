@@ -23,7 +23,7 @@ uint32_t iv_tx_tmp = 0; // iv for ongoing comms, for sending messages
 uint32_t iv_rx_tmp = 0; // iv for ongoing comms, for received messages
 
 uint32_t cnt_rx = 0;
-uint32_t cnt_tx = 0;
+uint32_t cnt_tx = 1;
 
 /**
  * interval is set to 50Hz to make it as fast as in real life
@@ -138,6 +138,7 @@ bool decode_msg_ongoing() {
   // decrypt
   chachapoly.decrypt(plaintext, ciphertext, PACKET_ONGOING_DATA_LEN);
 
+
 #if DEBUG
   Serial.println("Msg RX got IV");
   print_array(iv_rx,IV_SIZE);
@@ -149,17 +150,26 @@ bool decode_msg_ongoing() {
   print_array(plaintext,PACKET_ONGOING_DATA_LEN);
 #endif
 
+
   // authenticate
   if (chachapoly.checkTag(tag, TAG_SIZE)){
     // increment counter
-    cnt_rx++;
+    memcpy(&iv_rx_tmp, iv_rx, sizeof(iv_rx_tmp));
+    uint32_t cnt_tmp = iv_rx_tmp/16-1;
+    if (cnt_tmp > cnt_rx){
+      cnt_rx = cnt_tmp;
 #if DEBUG
-    Serial.print("\nMsg RX authenticaed, counter:");
-    Serial.println(cnt_rx);
-    Serial.print("\nMessage: ");
-    Serial.println((char*)plaintext);
+      Serial.print("\nMsg RX authenticaed, counter:");
+      Serial.println(cnt_rx);
+      Serial.print("\nMessage: ");
+      Serial.println((char*)plaintext);
 #endif
-    return true;
+      return true;
+    }
+    else {
+      Serial.println("Msg RX IV_CNT <= CNT_RX");
+      return false;
+    }
   }
   else {
     // error
@@ -287,11 +297,11 @@ void send_msg3(){
 void send_msg_ongoing(){
   static uint32_t lastSent = 0;
   static uint32_t time = 0;
-  
+
   // send three messages at 50Hz rate
   time = micros();
   if ( ((time - lastSent) >= getInterval()) && (cnt_tx<3) ) {
-    
+
     // increment IV
     iv_tx_tmp = (cnt_tx + 1) * 16;
 #if DEBUG
@@ -300,7 +310,7 @@ void send_msg_ongoing(){
     Serial.print("\nMessage IV: ");
     Serial.println(iv_tx_tmp,DEC);
 #endif
- 
+
     // set cipher
     chachapoly.clear();
     chachapoly.setKey(k_e,KEY_SIZE); // K_e
@@ -319,7 +329,7 @@ void send_msg_ongoing(){
      */
     PSP_protocol_head(PSP_CRYPTO, PACKET_ONGOING_LEN);
     for (uint8_t i = 0; i < IV_SIZE/2; i++) {
-     PSP_serialize_uint8(iv_tx[i]);
+      PSP_serialize_uint8(iv_tx[i]);
     }
 
     /* encrypt ACK */

@@ -22,7 +22,7 @@ uint32_t iv_tx_tmp = 0; // iv for ongoing comms, for sending messages
 uint32_t iv_rx_tmp = 0; // iv for ongoing comms, for received messages
 
 uint32_t cnt_rx = 0;
-uint32_t cnt_tx = 0;
+uint32_t cnt_tx = 1;
 
 /**
  * interval is set to 50Hz to make it as fast as in real life
@@ -188,6 +188,7 @@ bool decode_msg_ongoing() {
   // decrypt
   chachapoly.decrypt(plaintext, ciphertext, PACKET_ONGOING_DATA_LEN);
 
+
 #if DEBUG
   Serial.println("Msg RX got IV");
   print_array(iv_rx,IV_SIZE);
@@ -199,17 +200,28 @@ bool decode_msg_ongoing() {
   print_array(plaintext,PACKET_ONGOING_DATA_LEN);
 #endif
 
+
   // authenticate
   if (chachapoly.checkTag(tag, TAG_SIZE)){
     // increment counter
-    cnt_rx++;
+    memcpy(&iv_rx_tmp, iv_rx, sizeof(iv_rx_tmp));
+    uint32_t cnt_tmp = iv_rx_tmp/16-1;
+    if (cnt_tmp > cnt_rx){
 #if DEBUG
-    Serial.print("\nMsg RX authenticaed, counter:");
-    Serial.println(cnt_rx);
-    Serial.print("\nMessage: ");
-    Serial.println((char*)plaintext);
+      Serial.print("\nMsg RX authenticaed, counter:");
+      Serial.println(cnt_rx);
+      Serial.print("\nMessage: ");
+      Serial.println((char*)plaintext);
 #endif
-    return true;
+      return true;
+      cnt_rx = cnt_tmp;
+    }
+    else {
+      Serial.println("Msg RX IV_CNT <= CNT_RX");
+      return false;
+    }
+
+
   }
   else {
     // error
@@ -313,7 +325,7 @@ void send_msg_ongoing(){
      */
     PSP_protocol_head(PSP_CRYPTO, PACKET_ONGOING_LEN);
     for (uint8_t i = 0; i < 4; i++) {
-     PSP_serialize_uint8(iv_tx[i]);
+      PSP_serialize_uint8(iv_tx[i]);
     }
 
     /* encrypt ACK */
