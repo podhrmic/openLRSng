@@ -11,3 +11,8 @@
 *.hex
 libraries/*
 out
+
+# Eclipse files
+*/*/.settings
+*/*/.cproject
+*/*/.project
